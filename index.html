@@ -1,0 +1,215 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="robots" content="noindex">
+
+    <link href="https://fonts.googleapis.com/css?family=Ubuntu+Mono&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.18.1/styles/atom-one-dark.min.css">
+    <style>
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .content-padding {
+            padding-left: 300px;
+        }
+
+        .content {
+            max-width: 900px;
+            width: 100%;
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+            margin: 0 auto;
+        }
+
+        .display-pc {
+            display: block;
+        }
+
+        .display-mobile {
+            display: none;
+        }
+
+        .shadow-none {
+            box-shadow: none;
+        }
+
+        .sidenav {
+            box-shadow: none;
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .hr {
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        @media only screen and (max-width: 992px) {
+            .content-padding {
+                padding-left: 0;
+            }
+
+            .content {
+                padding: 1rem;
+            }
+
+            .display-pc {
+                display: none;
+            }
+
+            .display-mobile {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="display-mobile">
+    <div class="nav-wrapper">
+        <a href="#/" class="brand-logo" title></a>
+        <a href="#" data-target="slide-out" class="sidenav-trigger nav-btn"><i class="material-icons">menu</i></a>
+    </div>
+</nav>
+
+<div id="slide-out" class="sidenav sidenav-fixed">
+    <nav class="shadow-none display-pc">
+        <div class="nav-wrapper">
+            <a href="#/" class="brand-logo center" title></a>
+        </div>
+    </nav>
+    <ul id="sidenav"></ul>
+</div>
+
+<div class="content-padding">
+    <div id="progress" style="position: fixed;width: 100%">
+        <div class="progress" style="margin: 0;border-radius: 0">
+            <div class="indeterminate"></div>
+        </div>
+    </div>
+    <div id="page" class="content">Loading...</div>
+    <div class="hr"></div>
+    <div class="footer-copyright content">
+        <span copyright></span>
+        <a class="grey-text text-darken-1 right" href="https://github.com/uTen2c/MiniDoc">MiniDoc</a>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.18.1/highlight.min.js"></script>
+<script src="./config.js"></script>
+<script>
+    M.AutoInit();
+
+    const HASH_PREFIX = "#/";
+    let pageCache = new Map();
+    let baseUrl = env.baseUrl;
+
+    let url = new URL(location.href);
+    if (url.hash.length <= 0) {
+        url.hash = HASH_PREFIX;
+        location.href = url.href;
+    }
+
+    document.querySelectorAll("[title]").forEach(elem => elem.innerHTML = env.title);
+
+    document.querySelectorAll("[copyright]").forEach(elem => {
+        let copyright = env.copyright;
+        let values = {
+            title: env.title,
+            year: (new Date()).getFullYear()
+        };
+        Object.keys(values).map(key => {
+            let value = values[key];
+            copyright = copyright.replace("$" + key, value)
+        });
+
+        elem.innerHTML = copyright;
+    });
+
+    let sidenav = document.getElementById("sidenav");
+    let pages = env.nav;
+    Object.keys(pages).map(key => {
+        let value = pages[key];
+        let li = document.createElement("li");
+        let a = document.createElement("a");
+        a.href = HASH_PREFIX + key;
+        a.innerText = value;
+        li.appendChild(a);
+        sidenav.appendChild(li);
+    });
+
+    updatePage();
+    window.onhashchange = updatePage;
+
+    function updatePage() {
+        let access = getAccessFileName();
+        let request = new Request(access);
+        let progressElem = document.getElementById("progress");
+
+        if (pageCache[access] !== undefined) {
+            setContent(pageCache[access]);
+            return;
+        }
+
+        progressElem.style.display = "block";
+
+        fetch(request)
+            .then(res => {
+                if (res.status === 200) {
+                    return res.text();
+                } else if (res.status === 404) {
+                    return "# 404 Not Found";
+                }
+            })
+            .then(markdown => {
+                markdown = markdown.replace(/\$image/, url.origin + baseUrl + "/image");
+                let html = marked(markdown);
+                pageCache[access] = html;
+                setContent(html);
+                progressElem.style.display = "none";
+            });
+    }
+
+    function getAccessFileName() {
+        let url = new URL(location.href);
+        let hash = url.hash;
+        let file;
+        if (/#\/(.*)/.test(hash)) {
+            hash = hash.replace(HASH_PREFIX, "");
+            file = (hash.length <= 0 ? "index" : hash) + ".md";
+            return url.origin + baseUrl + "/markdown/" + file;
+        } else {
+            return null;
+        }
+    }
+
+    let sidenavInstance = M.Sidenav.getInstance(document.getElementById("slide-out"));
+    function setContent(content) {
+        let url = new URL(location.href);
+        let replaced = url.hash.replace(HASH_PREFIX, "");
+        let pathname = replaced.length <= 0 ? "" : replaced;
+        let pageTitle = env.nav[pathname];
+        pageTitle = pageTitle ? pageTitle : replaced;
+        document.title = pageTitle + " | " + env.title;
+
+        document.getElementById("page").innerHTML = content;
+        scrollTo(0, 0);
+        if (window.outerWidth < 992) {
+            sidenavInstance.close();
+        }
+
+        document.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightBlock(block);
+        });
+    }
+</script>
+</body>
+</html>
