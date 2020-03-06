@@ -1,5 +1,5 @@
 const env = {
-    title: "Doc title",
+    title: "MiniDoc",
     baseUrl: "/MiniDoc",
     copyright: "© $year $title",
     nav: {
